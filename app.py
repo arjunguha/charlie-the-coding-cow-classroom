@@ -58,6 +58,14 @@ class Task:
     signature: str
     name: str
 
+@dataclasses.dataclass
+class TaskResponse:
+    completion: str
+    # List of booleans that indicate whether or not the test succeeded
+    successes: List[bool]
+    # List of outputs on each test
+    outputs: List[str]
+
 
 def load_tasks(file_path: Path) -> List[Task]:
     tasks = []
@@ -72,17 +80,17 @@ def load_tasks(file_path: Path) -> List[Task]:
 
 async def submit_task(
     task: Task, description: str, username: str, model: str
-) -> Tuple[str, List[bool]]:
+) -> TaskResponse:
     prompt = f'{task.signature}\n    """\n    {description.strip()}\n    """'
     response = await completion(prompt, model)
     test_program = prompt + response
     results = []
+    outputs = []
     for example in task.examples:
         prog = (
             test_program
-            + f"\n\nassert {task.entrypoint}({example.input}) == {example.output}"
+            + f"\n\nout = {task.entrypoint}({example.input})\nprint(repr(out))\nassert out == {example.output}\n"
         )
-        print(prog)
         with tempfile.NamedTemporaryFile(delete=True, suffix=".py") as f:
             f.write(prog.encode("utf-8"))
             f.flush()
@@ -105,11 +113,14 @@ async def submit_task(
                     + "\n"
                 )
             results.append(exit_code == 0)
-    return response, results
+            # Confirmed that "".split produces a non-empty list.
+            outputs.append(stdout.split("\n", maxsplit=1)[0])
+
+    return TaskResponse(response, results, outputs)
 
 
 def format_task_details(
-    task: Task, interface: "TaskInterface", test_results: Optional[List[bool]] = None
+    task: Task, interface: "TaskInterface", test_results: Optional[List[bool]] = None, test_outputs: Optional[List[str]] = None
 ) -> str:
     md = f"### Task: {task.name}\n\n"
     if not interface.description_editable:
@@ -120,9 +131,13 @@ def format_task_details(
     md += "| Input | Output |"
     if test_results is not None:
         md += " Test Results |"
+    if test_outputs is not None:
+        md += " Actual Outputs |"
     md += "\n"
     md += "|-------|--------|"
     if test_results is not None:
+        md += "-------------|"
+    if test_outputs is not None:
         md += "-------------|"
     md += "\n"
     for i, example in enumerate(task.examples):
@@ -130,6 +145,8 @@ def format_task_details(
         if test_results is not None:
             result = "✅" if test_results[i] else "❌"
             md += f" {result} |"
+        if test_outputs is not None:
+            md += f" {test_outputs[i]} |"
         md += "\n"
     return md
 
@@ -156,7 +173,7 @@ class TaskInterface:
             return "Completed"
         return f"Task: {self.get_current_task().name}"
 
-    async def process_submission(self, description: str) -> str:
+    async def process_submission(self, description: str) -> TaskResponse:
         self.current_description = description
         task = self.get_current_task()
         return await submit_task(task, description, self.username, self.model)
@@ -231,8 +248,8 @@ def create_interface(users: Set[str], tasks: List[Task], model: str):
             )
 
             # Process the submission
-            completion, test_results = await interface.process_submission(description)
-            interface.completion = completion
+            task_response = await interface.process_submission(description)
+            interface.completion = task_response.completion
 
             # Hide processing message and show result
             yield (
@@ -243,7 +260,7 @@ def create_interface(users: Set[str], tasks: List[Task], model: str):
                 gr.update(visible=False),  # Hide description input
                 gr.update(
                     visible=True,
-                    value=format_task_details(current_task, interface, test_results),
+                    value=format_task_details(current_task, interface, task_response.successes, task_response.outputs),
                 ),  # Update and show task details
             )
 
