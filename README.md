@@ -21,6 +21,9 @@ be run separately in class). It simplifies data storage by logging all results
 to `results_USERNAME.jsonl` files. For authentication, it just uses a list of
 usernames without any passwords (defined in `users.txt`)
 
+The file `all_tasks.jsonl` contains all the tasks from the original platform,
+and is derived from [problems.yaml](https://osf.io/7dnvp).
+
 ## Requirements
 
 - Python 3
