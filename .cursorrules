@@ -1,0 +1,4 @@
+For Python:
+- Use double quoted strings
+- Use data classes when it makes sense
+- Prefer using pathlib
