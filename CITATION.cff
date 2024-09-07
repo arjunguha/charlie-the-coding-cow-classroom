@@ -1,21 +1,29 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 authors:
-  - family-names: "Nguyen"
-    given-names: "Sydney"
-  - family-names: "Babe"
-    given-names: "Hannah McLean"
-  - family-names: "Zi"
-    given-names: "Yangtian"
   - family-names: "Guha"
     given-names: "Arjun"
-  - family-names: "Anderson"
-    given-names: "Carolyn Jane"
-  - family-names: "Feldman"
-    given-names: "Molly Q"
-title: "How Beginning Programmers and Code LLMs (Mis)read Each Other"
-type: conference-paper
-conference:
-  name: "ACM Conference on Human Factors in Computing Systems"
-  abbreviation: "CHI"
-date-released: 2024
+date-released: 2024-10-07
+url: "https://github.com/arjunguha/charlie-the-coding-cow-classroom"
+title: "Charlie the Coding Cow: Classroom Edition"
+version: 1.0
+preferred-citation:
+  type: conference-paper
+  authors:
+    - family-names: "Nguyen"
+      given-names: "Sydney"
+    - family-names: "Babe"
+      given-names: "Hannah McLean"
+    - family-names: "Zi"
+      given-names: "Yangtian"
+    - family-names: "Guha"
+      given-names: "Arjun"
+    - family-names: "Anderson"
+      given-names: "Carolyn Jane"
+    - family-names: "Feldman"
+      given-names: "Molly Q"
+  title: "How Beginning Programmers and Code LLMs (Mis)read Each Other"
+  conference:
+    name: "ACM Conference on Human Factors in Computing Systems"
+    abbreviation: "CHI"
+  year: 2024
