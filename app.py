@@ -192,6 +192,7 @@ def on_login(users: Set[str]):
                 gr.update(visible=True),  # login still visible
                 gr.update(visible=False),  # main interface still not visible
                 gr.update(visible=True, value="Username not found"),
+                gr.update(visible=False),  # keep download button hidden
             )
 
         interface.username = username
@@ -199,6 +200,7 @@ def on_login(users: Set[str]):
             gr.update(visible=False),  # Hide login row
             gr.update(visible=True),  # Show main interface
             "",
+            gr.update(visible=True),  # Show download button
         )
 
     return callback
@@ -224,10 +226,26 @@ def create_interface(users: Set[str], tasks: List[Task], model: str):
             with gr.Row():
                 retry_button = gr.Button("Retry", visible=False)
                 next_button = gr.Button("Next Task", visible=False)
+                download_button = gr.Button("Download Results", visible=False)
+            file_to_download = gr.File(visible=False, label="Download Results")
+
         login_button.click(
             on_login(users),
             inputs=[username_input, interface_state],
-            outputs=[login_row, main_interface, login_error_message],
+            outputs=[login_row, main_interface, login_error_message, download_button],
+        )
+
+        # Add download functionality
+        def get_download_link(state: TaskInterface):
+            file_path = Path(f"results_{state.username}.jsonl")
+            if not file_path.exists():
+                return None
+            return gr.File(value=str(file_path), visible=True)
+
+        download_button.click(
+            get_download_link,
+            inputs=[interface_state],
+            outputs=[file_to_download]
         )
 
         async def on_submit(description, interface: TaskInterface):
