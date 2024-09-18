@@ -33,16 +33,42 @@ async def run_command(cmd, timeout=5):
         process.kill()
         return None, None, None
 
+def extract_code(response: str) -> str:
+    # Find the first code block in the response
+    code_block_start = response.find("```")
+    if code_block_start == -1:
+        return response  # Return the original response if no code block is found
+    code_block_end = response.find("```", code_block_start + 3)
+    if code_block_end == -1:
+        return response  # Return the original response if no closing code block is found
+    code_block = response[code_block_start + 3:code_block_end]
+    # Remove the name of the language from the start of the code block if it exists.
+    language_start = code_block.find("\n")
+    if language_start != -1:
+        code_block = code_block[language_start + 1:]
+    return code_block
 
-async def completion(prompt: str, model: str) -> str:
-    response = await client.completions.create(
-        model=model,
-        prompt=prompt,
-        temperature=0.2,
-        max_tokens=512,
-        stop=["\ndef", "\nclass", "\n#", "\n@"],
-    )
-    return response.choices[0].text
+
+async def completion(prompt: str, model: str, is_chat: bool) -> str:
+    if is_chat:
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant. Complete each given function and give the response in a code block. No need for explanations or tests."},
+                {"role": "user", "content": f"Complete this:\n\n```\n{prompt}\n```"}
+            ],
+            temperature=0.2,
+        )
+        return extract_code(response.choices[0].message.content)
+    else:
+        response = await client.completions.create(
+            model=model,
+            prompt=prompt,
+            temperature=0.2,
+            max_tokens=512,
+            stop=["\ndef", "\nclass", "\n#", "\n@"],
+        )
+        return response.choices[0].text
 
 
 @dataclasses.dataclass
@@ -79,11 +105,12 @@ def load_tasks(file_path: Path) -> List[Task]:
 
 
 async def submit_task(
-    task: Task, description: str, username: str, model: str
+    task: Task, description: str, username: str, model: str, is_chat: bool
 ) -> TaskResponse:
     prompt = f'{task.signature}\n    """\n    {description.strip()}\n    """'
-    response = await completion(prompt, model)
-    test_program = prompt + response
+    response = await completion(prompt, model, is_chat)
+    # Chat models will return a complete function wit the prompt.
+    test_program = prompt + response if not is_chat else response
     results = []
     outputs = []
     for example in task.examples:
@@ -124,7 +151,10 @@ def format_task_details(
 ) -> str:
     md = f"### Task: {task.name}\n\n"
     if not interface.description_editable:
-        md += f'```python\n{task.signature}\n    """\n    {interface.current_description}\n    """{interface.completion}\n```\n\n'
+        if not interface.is_chat:
+            md += f'```python\n{task.signature}\n    """\n    {interface.current_description}\n    """{interface.completion}\n```\n\n'
+        else:
+            md += f'```python\n{interface.completion}\n```\n\n'
     else:
         md += f"```python\n{task.signature}\n```\n\n"
     md += "### Examples:\n\n"
@@ -155,6 +185,7 @@ def format_task_details(
 class TaskInterface:
     tasks: List[Task]
     model: str
+    is_chat: bool
     current_index: int = 0
     current_description: str = ""
     description_editable: bool = True
@@ -176,7 +207,7 @@ class TaskInterface:
     async def process_submission(self, description: str) -> TaskResponse:
         self.current_description = description
         task = self.get_current_task()
-        return await submit_task(task, description, self.username, self.model)
+        return await submit_task(task, description, self.username, self.model, self.is_chat)
 
     def update_description(self, description: str) -> None:
         self.current_description = description
@@ -206,9 +237,9 @@ def on_login(users: Set[str]):
     return callback
 
 
-def create_interface(users: Set[str], tasks: List[Task], model: str):
+def create_interface(users: Set[str], tasks: List[Task], model: str, is_chat: bool):
     with gr.Blocks() as demo:
-        interface_state = gr.State(TaskInterface(tasks, model=model))
+        interface_state = gr.State(TaskInterface(tasks, model=model, is_chat=is_chat))
 
         # Add login components
         with gr.Column(visible=True) as login_row:
@@ -371,12 +402,13 @@ def main():
     parser.add_argument("--server-port", type=int, default=7860, help="Port for Gradio interface")
     parser.add_argument("--share", action="store_true", default=False, help="Enable sharing of Gradio interface")
     parser.add_argument("--model", type=str, default="meta-llama/Meta-Llama-3.1-8B", help="Model name for completions")
+    parser.add_argument("--is-chat", action="store_true", default=False, help="Use chat completion instead of regular completion")
     args = parser.parse_args()
 
     tasks = load_tasks(Path(args.tasks))
     users = Path(args.users).read_text().splitlines()
     users = set(user.strip() for user in users if user.strip())
-    demo = create_interface(users, tasks, args.model)
+    demo = create_interface(users, tasks, args.model, args.is_chat)
 
     demo.launch(
         server_name=args.server_name,
