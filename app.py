@@ -12,8 +12,11 @@ import argparse
 BASE_URL = os.getenv("BASE_URL")
 API_KEY = os.getenv("API_KEY")
 
-if not BASE_URL or not API_KEY:
-    raise ValueError("BASE_URL or API_KEY environment variables are not set")
+if not API_KEY:
+    raise ValueError("API_KEY environment variable is not set")
+
+if not BASE_URL:
+    print("Using the default base URL (OpenAI)")
 
 client = AsyncOpenAI(base_url=BASE_URL, api_key=API_KEY)
 

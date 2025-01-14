@@ -45,3 +45,14 @@ and is derived from [problems.yaml](https://osf.io/7dnvp).
    ```
    python3 app.py --help
    ```
+
+## Example
+
+The following command starts the program with gpt-4o-mini, and makes it
+publicly accessible:
+
+```bash
+API_KEY=$OPENAI_API_KEY python3 app.py --model gpt-4o-mini --share --is-chat
+```
+
+After the program starts, Gradio will print the public URL to the console.
